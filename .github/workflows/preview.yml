@@ -1,0 +1,58 @@
+# Plan morning-digest § 3 and § 4. Saves one rig page as a single HTML file and publishes it on
+# GitHub Pages. Deployed as an artifact, never committed (ADR 0003: no previews in the repo).
+# Run by hand only. For the clean-up (§ 4), set `marker` to "unset": the banner then reads
+# "no marker set", and the new deploy replaces the old page at the same link.
+name: preview
+
+on:
+  workflow_dispatch:
+    inputs:
+      night:
+        description: Night to preview (YYYY-MM-DD)
+        default: '2026-10-28'
+      marker:
+        description: '"lane" to show LANE_MARKER from the repo secret, "unset" to leave it out'
+        type: choice
+        options: [lane, unset]
+        default: lane
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: pnpm install --no-frozen-lockfile
+      - name: Save the page
+        env:
+          LANE_MARKER: ${{ inputs.marker == 'lane' && secrets.LANE_MARKER || '' }}
+          NIGHT: ${{ inputs.night }}
+        run: |
+          pnpm start &
+          server=$!
+          for i in $(seq 1 30); do curl -sf http://localhost:8787/health && break; sleep 1; done
+          mkdir -p _site
+          curl -sf "http://localhost:8787/digest/$NIGHT" -o _site/index.html
+          kill $server
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deploy
+        uses: actions/deploy-pages@v4
