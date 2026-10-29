@@ -31,6 +31,8 @@ export type Night = {
   night: string;
   // Sorted by job, so the page and the JSON agree on order (ADR 0001).
   rows: DigestRow[];
+  // Parsed lines by status, across all jobs. The board shows these beside each night.
+  counts: Record<RunStatus, number>;
   // Lines that didn't parse as a RunLine. Counted, never thrown.
   badLines: number;
 };
